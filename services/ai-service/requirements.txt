@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+langchain
+openai
+qdrant-client
+pydantic
+pydantic-settings
+numpy
+tiktoken
+pypdf
+unstructured
+arq
+redis
+python-dotenv
+httpx

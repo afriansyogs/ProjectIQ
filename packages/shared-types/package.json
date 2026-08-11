@@ -1,0 +1,15 @@
+{
+  "name": "@repo/shared-types",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "generate:openapi": "python3 ../../services/api/export_openapi.py && npx openapi-typescript ../../services/api/openapi.json -o src/api-schema.ts"
+  },
+  "dependencies": {
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^6.7.0"
+  }
+}

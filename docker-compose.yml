@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "${QDRANT_PORT}:6333"
+      - "${QDRANT_GRPC_PORT}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  api-service:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT}:8000"
+    environment:
+      - PROJECT_NAME=${PROJECT_NAME}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - DEBUG=${DEBUG}
+      - API_V1_STR=${API_V1_STR}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - AI_SERVICE_URL=${AI_SERVICE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+    volumes:
+      - ./services/api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - postgres
+      - redis
+
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "${AI_SERVICE_PORT}:8001"
+    environment:
+      - PROJECT_NAME=${PROJECT_NAME}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - QDRANT_HOST=${QDRANT_HOST}
+      - QDRANT_PORT=${QDRANT_PORT}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./services/ai-service:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    depends_on:
+      - redis
+      - qdrant
+
+  client:
+    build:
+      context: ./apps/client
+      dockerfile: Dockerfile
+    ports:
+      - "${CLIENT_PORT}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    volumes:
+      - ./apps/client:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api-service
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
