@@ -67,8 +67,13 @@ services:
       - REDIS_PORT=${REDIS_PORT}
       - QDRANT_HOST=${QDRANT_HOST}
       - QDRANT_PORT=${QDRANT_PORT}
+      - QDRANT_COLLECTION_NAME=${QDRANT_COLLECTION_NAME}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL}
+      - CHAT_MODEL=${CHAT_MODEL}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY} 
+      - GEMINI_BASE_URL=${GEMINI_BASE_URL} 
     volumes:
       - ./services/ai-service:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
