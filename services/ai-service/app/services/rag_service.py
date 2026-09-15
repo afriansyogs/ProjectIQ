@@ -10,12 +10,16 @@ from app.schemas.rag import (
     DocumentIngestResponse,
     ChatQueryRequest,
     ChatQueryResponse,
-    SourceNode
+    SourceNode,
 )
 
+
 class RAGService:
-    def __init__(self):
-        self.ai_client = AsyncOpenAI(api_key=settings.GEMINI_API_KEY, base_url=settings.GEMINI_BASE_URL)
+    def __init__(self) -> None:
+        self.ai_client = AsyncOpenAI(
+            api_key=settings.GEMINI_API_KEY,
+            base_url=settings.GEMINI_BASE_URL,
+        )
         self.qdrant_client = AsyncQdrantClient(
             host=settings.QDRANT_HOST,
             port=settings.QDRANT_PORT,
@@ -36,18 +40,19 @@ class RAGService:
         embed_response = await self.ai_client.embeddings.create(
             input=chunks,
             model=settings.EMBEDDING_MODEL,
-            dimensions=768
+            dimensions=768,
         )
 
         points = []
         for i, (chunk_text, emb_item) in enumerate(zip(chunks, embed_response.data)):
+            # Deterministic UUID
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{data.document_id}:{i}"))
-            
+
             payload = {
-                "document_id" : data.document_id,
-                "title" : data.title,
-                "chunk_index" : i,
-                "text" : chunk_text,
+                "document_id": data.document_id,
+                "title": data.title,
+                "chunk_index": i,
+                "text": chunk_text,
                 "char_length": len(chunk_text),
                 **(data.metadata or {}),
             }
@@ -68,9 +73,9 @@ class RAGService:
         return DocumentIngestResponse(
             document_id=data.document_id,
             total_chunks=len(points),
-            message=f"Successfully ingested {len(points)} chunks.",
+            message=f"Successfully indexed {len(points)} chunks into collection '{settings.QDRANT_COLLECTION_NAME}'.",
         )
-    
+
     async def query_chat(self, req: ChatQueryRequest) -> ChatQueryResponse:
         query_embed_resp = await self.ai_client.embeddings.create(
             input=[req.question],
@@ -98,35 +103,38 @@ class RAGService:
                     score=round(float(hit.score), 4),
                 )
             )
-        
+
         if not sources:
             return ChatQueryResponse(
-                answer="I can't find the answer to your question in the documents.",
+                answer="No relevant information was found in the indexed documents to answer your question.",
                 sources=[],
                 model_used=settings.CHAT_MODEL,
             )
-        
+
         context_blocks = [
             f"Document: {s.title} (ID: {s.document_id}), Chunk {s.chunk_index}\n"
             f"Score: {s.score}\n"
-            f"Text:\n{s.text}"
+            f"Content:\n{s.text}"
             for s in sources
         ]
         context_text = "\n\n".join(context_blocks)
 
         system_prompt = (
-            "You are an intelligent AI assistant for the company's Knowledge Base.\n"                                                                                                                 
-            "Your task: Answer users' questions ONLY based on the context of the document provided below.\n"                                                                           
-            "Important rules:\n"                                                                                                                                                                
-            "1. If the answer is not found within the document context, honestly and politely state that the information was not found in the document.\n"                                           
-            "2. Do not make up answers or invent information beyond the content of the document.\n"                                                                                                            
-            "3. Mention the name of the reference document if relevant."
+            "You are an expert AI assistant for the enterprise ProjectIQ Knowledge Base.\n"
+            "Your task: Answer user questions strictly and exclusively using the provided document excerpts.\n"
+            "Strict Guidelines:\n"
+            "1. Ground all claims directly in the provided context.\n"
+            "2. If the context does not contain sufficient facts to answer, explicitly and politely state that the information is not present in the documents.\n"
+            "3. Do not invent, extrapolate, or assume facts beyond what is written.\n"
+            "4. Cite the source document title when referencing facts."
         )
 
         user_prompt = (
-            f"Context of the Reference Document:\n"
-            f"{context_text}\n\n"
-            f"User Question: {req.question}\n"
+            f"Document context:\n"
+            f"-----------------\n"
+            f"{context_text}\n"
+            f"-----------------\n\n"
+            f"User question: {req.question}"
         )
 
         completion = await self.ai_client.chat.completions.create(
@@ -137,7 +145,7 @@ class RAGService:
             ],
             temperature=0.2,
         )
-        
+
         answer_text = completion.choices[0].message.content or ""
 
         return ChatQueryResponse(
@@ -145,5 +153,6 @@ class RAGService:
             sources=sources,
             model_used=settings.CHAT_MODEL,
         )
+
 
 rag_service = RAGService()
