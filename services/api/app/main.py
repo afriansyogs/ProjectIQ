@@ -14,8 +14,6 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing FastAPI Backend Service...", env=settings.ENVIRONMENT)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
     logger.info("Shutting down FastAPI Backend Service...")
     await engine.dispose()
