@@ -1,6 +1,6 @@
 import uuid
-from typing import AsyncGenerator
-from fastapi import Depends, HTTPException, status
+from typing import AsyncGenerator, Optional
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,7 +11,8 @@ from app.core.security import decode_access_token
 from app.infrastructure.db.models.user import User
 
 reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login"
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    auto_error=False,
 )
 
 
@@ -22,14 +23,19 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db_session),
-    token: str = Depends(reusable_oauth2),
+    header_token: Optional[str] = Depends(reusable_oauth2),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    token = request.cookies.get("access_token") or header_token
+    if not token:
+        raise credentials_exception
 
     payload = decode_access_token(token)
     if payload is None:
