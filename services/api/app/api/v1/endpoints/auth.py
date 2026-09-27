@@ -3,7 +3,11 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.deps import get_current_user, get_db_session
+from app.core.deps import (
+    get_current_user,
+    get_db_session,
+    get_user_by_email_or_username,
+)
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.infrastructure.db.models.user import User
 from app.schemas.auth import (
@@ -92,13 +96,7 @@ async def login(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    query = select(User).where(
-        or_(
-            User.username == data.username_or_email,
-            User.email == data.username_or_email,
-        )
-    )
-    user = (await db.execute(query)).scalar_one_or_none()
+    user = await get_user_by_email_or_username(db, data.username_or_email)
     if not user:
         raise credentials_exception
 
