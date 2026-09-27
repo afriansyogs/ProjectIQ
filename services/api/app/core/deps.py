@@ -10,6 +10,7 @@ from app.core.database import get_async_db
 from app.core.security import decode_access_token
 from app.infrastructure.db.models.project import Project
 from app.infrastructure.db.models.user import User, UserRole
+from app.infrastructure.db.models.work_management import Issue
 from app.infrastructure.db.models.workspace import WorkspaceMember, WorkspaceMemberRole
 
 reusable_oauth2 = OAuth2PasswordBearer(
@@ -148,5 +149,31 @@ async def verify_project_access(
     )
 
     return project
+
+
+async def verify_issue_access(
+    db: AsyncSession,
+    issue_id: uuid.UUID,
+    user_id: uuid.UUID,
+    required_workspace_roles: Optional[list[WorkspaceMemberRole]] = None,
+) -> tuple[Issue, Project]:
+    query = select(Issue).where(Issue.id == issue_id)
+    issue = (await db.execute(query)).scalar_one_or_none()
+
+    if not issue:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Issue not found.",
+        )
+
+    project = await verify_project_access(
+        db=db,
+        project_id=issue.project_id,
+        user_id=user_id,
+        required_workspace_roles=required_workspace_roles,
+    )
+
+    return issue, project
+
 
 
